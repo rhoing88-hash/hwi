@@ -2375,13 +2375,15 @@ html.pm-on .top{display:none}
 .pmbar b{font-variant-numeric:tabular-nums;color:var(--ink)}
 .pmbar button{border:0;border-radius:999px;padding:7px 12px;background:#F1F1F3;font:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
 .pmbar button.pri{background:var(--ink);color:#fff}
+/* 발표 모드 안내(전체 화면이 막혔을 때, 새 탭으로 열었을 때). 발표 모드 단추 아래에 잠깐 뜬다 */
+.pmtip{position:fixed;top:calc(var(--hd) + 10px);right:24px;z-index:150;padding:10px 18px;border-radius:999px;background:var(--ink);color:#fff;font-family:var(--sf);font-weight:700;font-size:15px;white-space:nowrap;box-shadow:0 14px 30px -16px rgba(17,17,17,.6)}
+.pmtip[hidden]{display:none}
 
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{animation:none!important;transition:none!important}
 }
 </style>
-<script>window.__lrTalk = { key: "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" };</script>
 </head>
 <body>
 <header class="top" id="topbar">
@@ -3791,14 +3793,27 @@ if (FIX == null) requestAnimationFrame(loop);
   const cur = () => { let i = 0; SCR.forEach((s, k) => { if (s.getBoundingClientRect().top < innerHeight * .45) i = k; }); return i; };
   const goScr = i => { i = Math.max(0, Math.min(SCR.length - 1, i)); SCR[i].scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   addEventListener('scroll', () => { $('b', pmBar).textContent = `${cur() + 1} / ${SCR.length}`; }, { passive: true });
+  const tipEl = document.createElement('div');
+  tipEl.className = 'pmtip'; tipEl.hidden = true; document.body.append(tipEl);
+  const tip = t => {
+    // 상단 바가 보이면 발표 모드 단추 오른쪽 끝에 맞춘다
+    const r = $('#pm-btn').getBoundingClientRect(); tipEl.style.right = r.width ? (HTMLEL.clientWidth - r.right) + 'px' : '';
+    tipEl.textContent = t; tipEl.hidden = false; clearTimeout(tipEl._t); tipEl._t = setTimeout(() => { tipEl.hidden = true; }, 5000);
+  };
+  const BLOCKED = '이 화면에서는 전체 화면이 막혀 있어요. F11을 눌러 주세요';
   function pmStart() {
+    const i = cur();
+    // 게시판이 다른 서버 주소의 틀(iframe)에 이 페이지를 띄우면 그 틀 안에서는 전체 화면이 막힌다. 그때는 이 페이지만 새 탭에 연다(새 탭에서 발표 모드를 다시 누름)
+    if (!document.fullscreenEnabled && window.top !== window && !window.frameElement && /^(https?|file):/.test(location.href)
+      && window.open(location.href.split('#')[0] + '#pm', '_blank')) return;
     HTMLEL.classList.add('pm-on'); pmBar.hidden = false;
-    const i = cur(); if (HTMLEL.requestFullscreen) HTMLEL.requestFullscreen().catch(() => { });
+    if (document.fullscreenEnabled) HTMLEL.requestFullscreen().catch(() => tip(BLOCKED)); else tip(BLOCKED);
     setTimeout(() => SCR[i].scrollIntoView({ block: 'start' }), 120);
   }
   function pmEnd() { HTMLEL.classList.remove('pm-on'); pmBar.hidden = true; if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); }
   // 전체 화면이 바뀌면 화면 높이가 달라지므로 보던 화면에 다시 맞춘다. Esc로 전체 화면을 나가면 발표 모드도 끝낸다
   document.addEventListener('fullscreenchange', () => { const i = cur(); if (!document.fullscreenElement && HTMLEL.classList.contains('pm-on')) pmEnd(); setTimeout(() => SCR[i].scrollIntoView({ block: 'start' }), 80); });
+  if (location.hash === '#pm') tip('발표 모드를 누르면 전체 화면이 돼요');
   $('#pm-btn').addEventListener('click', e => { e.currentTarget.blur(); pmStart(); });
   pmBar.addEventListener('click', e => { const b = e.target.closest('[data-pm]'); if (!b) return; b.blur(); if (b.dataset.pm === 'end') pmEnd(); else goScr(cur() + (b.dataset.pm === 'next' ? 1 : -1)); });
   // 리포트 창 안을 누른 뒤에는 그 창이 키를 받는다(리포트 넘기기). 바깥을 누르면 다시 화면 넘기기
